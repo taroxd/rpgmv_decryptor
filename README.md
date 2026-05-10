@@ -13,19 +13,24 @@ The tool is implemented with C++17 standard library only and configured for stat
 
 ## What it does
 
-1. Reads `encryptionKey` from `www/data/System.json`
-2. Scans all subdirectories under `www/img`
+1. Reads `encryptionKey` from `data/System.json`
+2. Scans all subdirectories under `img` (also supports `www/img`)
 3. Decrypts encrypted RPGMV resources:
    - `.rpgmvp -> .png`
    - `.rpgmvo -> .ogg`
    - `.rpgmvm -> .m4a`
+   - `.png_ -> .png`
+   - `.ogg_ -> .ogg`
+   - `.m4a_ -> .m4a`
 4. Writes decrypted files to the output directory with mirrored relative paths
 
 ## Supported input folder layout
 
 The first argument can be either:
 
+- `<input>/...` (directly contains `data` and `img`)
 - `<input>/www/...`
+- `<input>/<any_subdir>/...` (subdirectory directly contains `data` and `img`)
 - `<input>/<any_subdir>/www/...`
 
 ## Build (Visual Studio)
@@ -46,8 +51,8 @@ rpgmv_decrypt.exe "path/to/project" "output_dir"
 
 After execution:
 
-- Input root is resolved to a `www` folder
-- Files under `www/img` are recursively decrypted
+- Input root is resolved to either `<game_root>` or `<game_root>/www` automatically
+- Files under the resolved `img` directory are recursively decrypted
 - Output directories are auto-created
 - Example output:
   - Input: `...\www\img\pictures\xxx.rpgmvp`

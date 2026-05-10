@@ -108,13 +108,13 @@ bool DecryptRpgmData(
     std::vector<std::uint8_t>& decryptedData,
     std::string& error) {
     if (encryptedData.size() < kHeaderLength) {
-        error = "Encrypted file is smaller than RPGMV header length.";
+        error = "Encrypted file is smaller than RPGMV/RPGMZ header length.";
         return false;
     }
 
     for (std::size_t i = 0; i < kHeaderLength; ++i) {
         if (encryptedData[i] != kExpectedHeader[i]) {
-            error = "RPGMV header mismatch.";
+            error = "RPGMV/RPGMZ header mismatch.";
             return false;
         }
     }
@@ -130,7 +130,8 @@ bool DecryptRpgmData(
 
 bool IsEncryptedExtension(const std::filesystem::path& filePath) {
     std::string ext = ToLowerAscii(filePath.extension().string());
-    return ext == ".rpgmvp" || ext == ".rpgmvo" || ext == ".rpgmvm";
+    return ext == ".rpgmvp" || ext == ".rpgmvo" || ext == ".rpgmvm" ||
+           ext == ".png_" || ext == ".ogg_" || ext == ".m4a_";
 }
 
 std::filesystem::path MapDecryptedRelativePath(const std::filesystem::path& relativeEncryptedPath) {
@@ -142,6 +143,12 @@ std::filesystem::path MapDecryptedRelativePath(const std::filesystem::path& rela
     } else if (ext == ".rpgmvo") {
         mappedPath.replace_extension(".ogg");
     } else if (ext == ".rpgmvm") {
+        mappedPath.replace_extension(".m4a");
+    } else if (ext == ".png_") {
+        mappedPath.replace_extension(".png");
+    } else if (ext == ".ogg_") {
+        mappedPath.replace_extension(".ogg");
+    } else if (ext == ".m4a_") {
         mappedPath.replace_extension(".m4a");
     }
 

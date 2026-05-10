@@ -6,14 +6,14 @@ namespace rpgmv {
 
 namespace {
 
-bool IsValidWwwRoot(const std::filesystem::path& wwwRoot) {
+bool IsValidContentRoot(const std::filesystem::path& contentRoot) {
     std::error_code ec;
-    if (!std::filesystem::exists(wwwRoot, ec) || !std::filesystem::is_directory(wwwRoot, ec)) {
+    if (!std::filesystem::exists(contentRoot, ec) || !std::filesystem::is_directory(contentRoot, ec)) {
         return false;
     }
 
-    const std::filesystem::path systemJsonPath = wwwRoot / "data" / "System.json";
-    const std::filesystem::path imgRoot = wwwRoot / "img";
+    const std::filesystem::path systemJsonPath = contentRoot / "data" / "System.json";
+    const std::filesystem::path imgRoot = contentRoot / "img";
 
     if (!std::filesystem::exists(systemJsonPath, ec) || !std::filesystem::is_regular_file(systemJsonPath, ec)) {
         return false;
@@ -25,14 +25,17 @@ bool IsValidWwwRoot(const std::filesystem::path& wwwRoot) {
     return true;
 }
 
-GamePaths BuildGamePaths(const std::filesystem::path& inputRoot, const std::filesystem::path& gameRoot) {
-    const std::filesystem::path wwwRoot = gameRoot / "www";
+GamePaths BuildGamePaths(
+    const std::filesystem::path& inputRoot,
+    const std::filesystem::path& gameRoot,
+    const std::filesystem::path& contentRoot) {
     GamePaths paths;
     paths.inputRoot = inputRoot;
     paths.gameRoot = gameRoot;
-    paths.wwwRoot = wwwRoot;
-    paths.systemJsonPath = wwwRoot / "data" / "System.json";
-    paths.imgRoot = wwwRoot / "img";
+    // Kept as-is for backward compatibility with existing struct fields.
+    paths.wwwRoot = contentRoot;
+    paths.systemJsonPath = contentRoot / "data" / "System.json";
+    paths.imgRoot = contentRoot / "img";
     return paths;
 }
 
@@ -45,13 +48,13 @@ std::optional<GamePaths> ResolveGamePaths(const std::filesystem::path& inputRoot
         return std::nullopt;
     }
 
-    const std::filesystem::path directWwwRoot = inputRoot / "www";
-    if (IsValidWwwRoot(directWwwRoot)) {
-        return BuildGamePaths(inputRoot, inputRoot);
+    if (IsValidContentRoot(inputRoot)) {
+        return BuildGamePaths(inputRoot, inputRoot, inputRoot);
     }
 
-    for (const auto& entry : std::filesystem::directory_iterator(inputRoot, ec)) {
-        if (ec) {
+    std::error_code firstLevelEc;
+    for (const auto& entry : std::filesystem::directory_iterator(inputRoot, firstLevelEc)) {
+        if (firstLevelEc) {
             break;
         }
 
@@ -60,15 +63,31 @@ std::optional<GamePaths> ResolveGamePaths(const std::filesystem::path& inputRoot
         }
 
         const std::filesystem::path nestedRoot = entry.path();
-        const std::filesystem::path nestedWwwRoot = nestedRoot / "www";
-        if (IsValidWwwRoot(nestedWwwRoot)) {
-            return BuildGamePaths(inputRoot, nestedRoot);
+        if (IsValidContentRoot(nestedRoot)) {
+            return BuildGamePaths(inputRoot, nestedRoot, nestedRoot);
+        }
+
+        std::error_code secondLevelEc;
+        for (const auto& secondEntry : std::filesystem::directory_iterator(nestedRoot, secondLevelEc)) {
+            if (secondLevelEc) {
+                break;
+            }
+            if (!secondEntry.is_directory()) {
+                continue;
+            }
+
+            const std::filesystem::path nestedNestedRoot = secondEntry.path();
+            if (IsValidContentRoot(nestedNestedRoot)) {
+                return BuildGamePaths(inputRoot, nestedRoot, nestedNestedRoot);
+            }
         }
     }
 
     error =
-        "Could not locate game data. Expected either <input>/www/data/System.json and <input>/www/img, "
-        "or <input>/*/www/data/System.json and <input>/*/www/img.";
+        "Could not locate game data. Expected one of:\n"
+        "  <input>/data/System.json and <input>/img\n"
+        "  <input>/*/data/System.json and <input>/*/img\n"
+        "  <input>/*/*/data/System.json and <input>/*/*/img";
     return std::nullopt;
 }
 
